@@ -2,108 +2,162 @@
 
 open System
 open System.Data
-open Microsoft.Data.SqlClient
 open Domain
 open Dapper.FSharp.MSSQL
+open Microsoft.Data.SqlClient
+open Shared.Monads
 
 module Repository =
-    type Role =
+    type private Role =
         | Admin
         | Normal
         | ReadOnly
 
-    type UserEntity = {
+    type private UserEntity = {
         Id: Guid
+        Email: string
         Name: string
         Surname: string
-        Email: string
         Role: Role
     }
 
-    type Entities = | UserEntity of UserEntity
+    let private userTable = table<UserEntity>
 
-    let private users = table<UserEntity>
-
-    let private conn: IDbConnection =
-        new SqlConnection("connectionString") :> IDbConnection
+    let private createUserData email firstName surname : UserData = {
+        Email = email
+        FirstName = FirstName firstName
+        LastName = LastName surname
+    }
 
     let private toDomain (user: UserEntity) =
-        King {
-            Data = {
-                PersonalData = {
-                    FirstName = FirstName user.Name
-                    LastName = LastName user.Surname
-                    Email =
-                        match Email.Create user.Email with
-                        | Ok email -> email
-                        | _ -> failwith ""
-                }
-                Id = Uuid user.Id
-            }
+        let maybeUserData =
+            createUserData <*> Email.Create(user.Email)
+            <!> BaseName.Create(user.Name)
+            <!> BaseName.Create(user.Surname)
+
+        match maybeUserData with
+        | Error err -> Error err
+        | Ok data ->
+            match user.Role with
+            | Admin -> Ok(User.Admin { Data = data; Id = Id user.Id })
+            | Normal -> Ok(User.Normal { Id = (Id user.Id); Data = data })
+            | ReadOnly -> Ok(User.ReadOnly { Id = (Id user.Id); Data = data })
+
+
+    let private createUserEntity (u: BaseUser) (role: Role) =
+        let (Id id) = u.Id
+        let (FirstName name) = u.Data.FirstName
+        let (LastName lstName) = u.Data.LastName
+
+        {
+            Id = id
+            Name = name.Value
+            Surname = lstName.Value
+            Email = u.Data.Email.Value
+            Role = role
         }
 
     let private toEntity (user: User) =
         match user with
-        | King k ->
-            let (UserId.Uuid id) = k.Data.Id
-            let (FirstName name) = k.Data.PersonalData.FirstName
-            let (LastName lstName) = k.Data.PersonalData.LastName
+        | User.Admin user -> createUserEntity user Admin
+        | User.Normal user -> createUserEntity user Normal
+        | User.ReadOnly user -> createUserEntity user ReadOnly
 
-            {
-                Id = id
-                Name = name
-                Surname = lstName
-                Email = k.Data.PersonalData.Email.Value
-                Role = Admin
-            }
-        | Civilian c ->
-            let (UserId.Uuid id) = c.Data.Id
-            let (FirstName name) = c.Data.PersonalData.FirstName
-            let (LastName lstName) = c.Data.PersonalData.LastName
+    let private toUserResult (res: Result<User, string list>) =
+        match res with
+        | Error err -> InvalidUser(err)
+        | Ok v -> Successful(v)
 
-            {
-                Id = id
-                Name = name
-                Surname = lstName
-                Email = c.Data.PersonalData.Email.Value
-                Role = Normal
-            }
-        | Slave s ->
-            let (UserId.Uuid id) = s.Data.Id
-            let (FirstName name) = s.Data.PersonalData.FirstName
-            let (LastName lstName) = s.Data.PersonalData.LastName
 
-            {
-                Id = id
-                Name = name
-                Surname = lstName
-                Email = s.Data.PersonalData.Email.Value
-                Role = ReadOnly
-            }
+    let userById (userId: UserId) (conn:IDbConnection) = tryM {
+        return task {
+            let (Id id) = userId
 
-    let byId (entity: Entities) =
-        match entity with
-        | UserEntity en -> task{
-            let (id: Guid) = en.Id
-            let! user =
+            let! usersEntity =
                 select {
-                    for u in users do
+                    for u in userTable do
                         where (u.Id = id)
-                        }
-                        |> conn.SelectAsync<UserEntity>
+                }
+                |> conn.SelectAsync<UserEntity>
 
-            return user |> Seq.map toDomain
-            }
+            let users = usersEntity |> Seq.map toDomain
 
-    let all (entity: Entities) =
-        match entity with
-        | UserEntity _ -> task {
-            let! users =
+            return
+                match Seq.length users with
+                | 0 -> NotFound([ $"user with id {id} not found" ])
+                | 1 ->
+                    match Seq.head users with
+                    | Ok user -> Successful(user)
+                    | Error err -> InvalidUser(err)
+                | _ -> InvalidUser([ $"too many users with id {id}" ])
+        }
+    }
+
+    let allUsers (conn:IDbConnection) = tryM {
+        return task {
+            let! usersEntity =
                 select {
-                    for u in users do
+                    for u in userTable do
                         selectAll
                 }
                 |> conn.SelectAsync<UserEntity>
 
-            return users |> Seq.map toDomain
-          }
+            let users = usersEntity |> Seq.map toDomain |> Seq.map toUserResult
+            return users
+        }
+    }
+
+    let createUser (user: User) (conn:IDbConnection) = tryM {
+        let usr = user |> toEntity
+
+        return task {
+            let! inserted =
+                insert {
+                    into userTable
+                    value usr
+                }
+                |> conn.InsertAsync<UserEntity>
+
+            if inserted > 0 then
+                return Successful(inserted)
+            else
+                return FailToCreate("User not inserted")
+        }
+    }
+
+    let updateUser (user: User) (conn:IDbConnection) = tryM {
+        let usr = user |> toEntity
+
+        return task {
+            let! updated =
+                update {
+                    for u in userTable do
+                        set usr
+                        where (u.Id = usr.Id)
+                }
+                |> conn.UpdateAsync<UserEntity>
+
+            if updated > 0 then
+                return Successful(updated)
+            else
+                return FailToUpdate("User not updated")
+        }
+    }
+
+    let deleteUser (userId: UserId) (conn: IDbConnection) = tryM {
+        let (Id id) = userId
+
+        return task {
+            let! deleted =
+                delete {
+                    for u in userTable do
+                        where (u.Id = id)
+                }
+                |> conn.DeleteAsync
+
+            if deleted > 0 then
+                return Successful(deleted)
+            else
+                return FailToDelete("User not delete")
+        }
+    }

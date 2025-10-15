@@ -1,16 +1,12 @@
 ﻿module Shared.Monads
 
-type Exception<'r, 'err> =
-    | Ok of 'r
-    | Fail of 'err
+type Try<'r, 'err> = Try of predicate: (unit -> Result<'r, 'err>)
 
-type Try<'r, 'err> = Try of predicate: (unit -> Exception<'r, 'err>)
+// type TryT<'r, 'err> = TryT of Try<Async<'r>, Async<'err>>
 
-type TryT<'r, 'err> = TryT of Try<Async<'r>, Async<'err>>
-
-module TryT =
-
-    let inline run (TryT f) = f
+// module TryT =
+//
+//     let inline run (TryT f) = f
 
 // let inline bind (f: 't -> '``OutM<Try<'r, 'err>>>``) (a: TryT<'``OutM<Try<'t, 'err>>``>) =
 //     f (run a) |> TryT
@@ -26,17 +22,17 @@ module Try =
         try
             f ()
         with ex ->
-            Fail ex
+            Error ex
 
     let bind (f: 't -> Try<'r, exn>) (a: Try<'t, exn>) =
         Try(fun () ->
             match run a with
             | Ok t -> run (f t)
-            | Fail err -> Fail err)
+            | Error err -> Error err)
 
     let liftOk (t: 't) = Try(fun () -> Ok t)
 
-    let liftErr (t: 't) = Try(fun () -> Fail t)
+    let liftErr (t: 't) = Try(fun () -> Error t)
 
     let map (f: 't -> 'r) (a: Try<'t, exn>) = a |> bind (fun t -> liftOk (f t))
 
@@ -45,6 +41,11 @@ module Try =
 type TryBuilder() =
     member _.Bind(a, f) = Try.bind f a
     member _.Return(a) = Try.liftOk a
+    member _.ReturnFrom(a) = a
+    member _.Zero() = Try.liftOk ()
+    member _.Delay(f) = f ()
+
+let tryM = TryBuilder()
 
 type Reader<'env, 'a> = Reader of action: ('env -> 'a)
 
@@ -71,3 +72,13 @@ type ReaderBuilder() =
 
 // the builder instance
 let reader = ReaderBuilder()
+
+let (<*>) = Result.map
+
+let (<!>) t1 t2 =
+    match (t1, t2) with
+    | Ok f, Ok value -> Ok(f value)
+    | Error err, _ ->
+        match t2 with
+        | Ok _ -> Error err
+        | Error err2 -> Error(err2 @ err)
