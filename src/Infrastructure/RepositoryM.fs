@@ -1,9 +1,10 @@
 ﻿namespace Infrastructure
 
 open System
-open DataAccess.DbConnectionHandler
+open System.Data
 open Domain
 open Dapper.FSharp.MSSQL
+open Microsoft.Data.SqlClient
 open Shared.Monads
 
 module Repository =
@@ -67,19 +68,27 @@ module Repository =
         | Error err -> InvalidUser(err)
         | Ok v -> Successful(v)
 
+ type Repository =
+    val private conn : IDbConnection
+    private new(conn:IDbConnection) = {conn = conn}
+    static member Create(conn:string) =
+        let dbconn = new SqlConnection (conn)
+        match dbconn with
+        | null -> None
+        | v -> Some(Repository v )
 
-    let userById (userId: UserId) (hdr:DbConHandler) = tryM {
+    member this.userById (userId: UserId) = tryM {
         return task {
             let (Id id) = userId
 
             let! usersEntity =
                 select {
-                    for u in userTable do
+                    for u in Repository.userTable do
                         where (u.Id = id)
                 }
-                |> hdr.Conn.SelectAsync<UserEntity>
+                |> this.conn.SelectAsync<Repository.UserEntity>
 
-            let users = usersEntity |> Seq.map toDomain
+            let users = usersEntity |> Seq.map Repository.toDomain
 
             return
                 match Seq.length users with
@@ -92,71 +101,71 @@ module Repository =
         }
     }
 
-    let allUsers (hdr:DbConHandler) = tryM {
+    member this.allUsers = tryM {
         return task {
             let! usersEntity =
                 select {
-                    for u in userTable do
+                    for u in Repository.userTable do
                         selectAll
                 }
-                |> hdr.Conn.SelectAsync<UserEntity>
+                |> this.conn.SelectAsync<Repository.UserEntity>
 
-            let users = usersEntity |> Seq.map toDomain |> Seq.map toUserResult
+            let users = usersEntity |> Seq.map Repository.toDomain |> Seq.map Repository.toUserResult
             return users
         }
     }
 
-    let createUser (user: User) (hdr:DbConHandler) = tryM {
-        let usr = user |> toEntity
+    member this.createUser (user: User) = tryM {
+        let usr = user |> Repository.toEntity
 
         return task {
             let! inserted =
                 insert {
-                    into userTable
+                    into Repository.userTable
                     value usr
                 }
-                |> hdr.Conn.InsertAsync<UserEntity>
+                |> this.conn.InsertAsync<Repository.UserEntity>
 
             if inserted > 0 then
                 return Successful(inserted)
             else
-                return FailToCreate("user not inserted")
+                return FailToCreate("User not inserted")
         }
     }
 
-    let updateUser (user: User) (hdr:DbConHandler) = tryM {
-        let usr = user |> toEntity
+    member this.updateUser (user: User) = tryM {
+        let usr = user |> Repository.toEntity
 
         return task {
             let! updated =
                 update {
-                    for u in userTable do
+                    for u in Repository.userTable do
                         set usr
                         where (u.Id = usr.Id)
                 }
-                |> hdr.Conn.UpdateAsync<UserEntity>
+                |> this.conn.UpdateAsync<Repository.UserEntity>
 
             if updated > 0 then
                 return Successful(updated)
             else
-                return FailToUpdate("user not updated")
+                return FailToUpdate("User not updated")
         }
     }
 
-    let deleteUser (userId: UserId) (hdr:DbConHandler) = tryM {
+    member this.deleteUser (userId: UserId) = tryM {
         let (Id id) = userId
 
         return task {
             let! deleted =
                 delete {
-                    for u in userTable do
+                    for u in Repository.userTable do
                         where (u.Id = id)
                 }
-                |> hdr.Conn.DeleteAsync
+                |> this.conn.DeleteAsync
 
             if deleted > 0 then
                 return Successful(deleted)
             else
-                return FailToDelete("user not delete")
+                return FailToDelete("User not delete")
         }
     }

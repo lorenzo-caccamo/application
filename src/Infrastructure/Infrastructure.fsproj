@@ -7,7 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="DbConnectionHandler.fs" />
         <Compile Include="Repository.fs" />
+        <Compile Include="RepositoryM.fs" />
     </ItemGroup>
 
     <ItemGroup>
