@@ -78,6 +78,7 @@ let (<*>) = Result.map
 let (<!>) t1 t2 =
     match (t1, t2) with
     | Ok f, Ok value -> Ok(f value)
+    | Ok _, Error err -> Error(err)
     | Error err, _ ->
         match t2 with
         | Ok _ -> Error err
