@@ -5,11 +5,11 @@ open Domain
 open Shared.Monads
 
 type UserRepository = {
-    byId: UserId -> Try<UserResult<User, string seq>, exn>
-    all: unit -> Try<UserResult<User, string seq> seq, exn>
-    add: User -> Try<UserResult<int, string seq>, exn>
-    delete: UserId -> Try<UserResult<unit, string seq>, exn>
-    update: User -> Try<UserResult<unit, string seq>, exn>
+    byId: UserId -> Try<UserResult<User, string list>, exn>
+    all: unit -> Try<UserResult<User, string list> seq, exn>
+    add: User -> Try<UserResult<int, string list>, exn>
+    delete: UserId -> Try<UserResult<unit, string list>, exn>
+    update: User -> Try<UserResult<unit, string list>, exn>
 }
 
 let getUserById (id: UserId) =

@@ -24,15 +24,15 @@ module Repository =
 
     let private createUserData email firstName surname : UserData = {
         Email = email
-        FirstName = FirstName firstName
-        LastName = LastName surname
+        FirstName = firstName
+        LastName =  surname
     }
 
     let private toDomain (user: UserEntity) =
         let maybeUserData =
             createUserData <*> Email.Create(user.Email)
-            <!> BaseName.Create(user.Name)
-            <!> BaseName.Create(user.Surname)
+            <!> FirstName.Create(user.Name)
+            <!> LastName.Create(user.Surname)
 
         match maybeUserData with
         | Error err -> Error err
@@ -45,13 +45,11 @@ module Repository =
 
     let private createUserEntity (u: BaseUser) (role: Role) =
         let (Id id) = u.Id
-        let (FirstName name) = u.Data.FirstName
-        let (LastName lstName) = u.Data.LastName
 
         {
             Id = id
-            Name = name.Value
-            Surname = lstName.Value
+            Name = u.Data.FirstName.Value
+            Surname = u.Data.LastName.Value
             Email = u.Data.Email.Value
             Role = role
         }
@@ -66,7 +64,6 @@ module Repository =
         match res with
         | Error err -> InvalidUser(err)
         | Ok v -> Successful(v)
-
 
     let userById (userId: UserId) (hdr:DbConHandler) = tryM {
         return task {
