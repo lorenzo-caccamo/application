@@ -1,4 +1,4 @@
-﻿module DataAccess.DbConnectionHandler
+﻿module Infrastructure.DbConnectionHandler
 
 open System.Data
 open Microsoft.Data.SqlClient

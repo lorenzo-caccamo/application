@@ -6,6 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="DomainResult.fs" />
         <Compile Include="User.fs" />
     </ItemGroup>
 

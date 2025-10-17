@@ -58,11 +58,3 @@ type User =
     | Admin of BaseUser
     | Normal of BaseUser
     | ReadOnly of BaseUser
-
-type UserResult<'a, 'b> =
-    | Successful of 'a
-    | NotFound of 'b
-    | InvalidUser of 'b
-    | FailToCreate of 'b
-    | FailToUpdate of 'b
-    | FailToDelete of 'b

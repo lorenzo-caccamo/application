@@ -1,9 +1,10 @@
 ﻿namespace Infrastructure
 
 open System
-open DataAccess.DbConnectionHandler
 open Domain
+open Domain.DomainResult
 open Dapper.FSharp.MSSQL
+open Infrastructure.DbConnectionHandler
 open Shared.Monads
 
 module Repository =
@@ -62,11 +63,11 @@ module Repository =
 
     let private toUserResult (res: Result<User, string list>) =
         match res with
-        | Error err -> InvalidUser(err)
+        | Error err -> Invalid(err)
         | Ok v -> Successful(v)
 
-    let userById (userId: UserId) (hdr:DbConHandler) = tryM {
-        return task {
+    let userById (hdr:DbConHandler) (userId: UserId) = tryM {
+        return async {
             let (Id id) = userId
 
             let! usersEntity =
@@ -74,7 +75,7 @@ module Repository =
                     for u in userTable do
                         where (u.Id = id)
                 }
-                |> hdr.Conn.SelectAsync<UserEntity>
+                |> hdr.Conn.SelectAsync<UserEntity> |> Async.AwaitTask
 
             let users = usersEntity |> Seq.map toDomain
 
@@ -84,35 +85,35 @@ module Repository =
                 | 1 ->
                     match Seq.head users with
                     | Ok user -> Successful(user)
-                    | Error err -> InvalidUser(err)
-                | _ -> InvalidUser([ $"too many users with id {id}" ])
+                    | Error err -> Invalid(err)
+                | _ -> Invalid([ $"too many users with id {id}" ])
         }
     }
 
-    let allUsers (hdr:DbConHandler) = tryM {
-        return task {
+    let allUsers (hdr:DbConHandler) () = tryM {
+        return async {
             let! usersEntity =
                 select {
                     for u in userTable do
                         selectAll
                 }
-                |> hdr.Conn.SelectAsync<UserEntity>
+                |> hdr.Conn.SelectAsync<UserEntity> |> Async.AwaitTask
 
             let users = usersEntity |> Seq.map toDomain |> Seq.map toUserResult
             return users
         }
     }
 
-    let createUser (user: User) (hdr:DbConHandler) = tryM {
+    let createUser (hdr:DbConHandler) (user: User) = tryM {
         let usr = user |> toEntity
 
-        return task {
+        return async {
             let! inserted =
                 insert {
                     into userTable
                     value usr
                 }
-                |> hdr.Conn.InsertAsync<UserEntity>
+                |> hdr.Conn.InsertAsync<UserEntity> |> Async.AwaitTask
 
             if inserted > 0 then
                 return Successful(inserted)
@@ -121,17 +122,17 @@ module Repository =
         }
     }
 
-    let updateUser (user: User) (hdr:DbConHandler) = tryM {
+    let updateUser (hdr:DbConHandler) (user: User) = tryM {
         let usr = user |> toEntity
 
-        return task {
+        return async {
             let! updated =
                 update {
                     for u in userTable do
                         set usr
                         where (u.Id = usr.Id)
                 }
-                |> hdr.Conn.UpdateAsync<UserEntity>
+                |> hdr.Conn.UpdateAsync<UserEntity> |> Async.AwaitTask
 
             if updated > 0 then
                 return Successful(updated)
@@ -140,16 +141,16 @@ module Repository =
         }
     }
 
-    let deleteUser (userId: UserId) (hdr:DbConHandler) = tryM {
+    let deleteUser (hdr:DbConHandler) (userId: UserId) = tryM {
         let (Id id) = userId
 
-        return task {
+        return async {
             let! deleted =
                 delete {
                     for u in userTable do
                         where (u.Id = id)
                 }
-                |> hdr.Conn.DeleteAsync
+                |> hdr.Conn.DeleteAsync |> Async.AwaitTask
 
             if deleted > 0 then
                 return Successful(deleted)

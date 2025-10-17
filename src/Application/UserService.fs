@@ -2,57 +2,43 @@
 
 open System
 open Domain
+open Domain.DomainResult
 open Shared.Monads
 
-type UserRepository = {
-    byId: UserId -> Try<UserResult<User, string list>, exn>
-    all: unit -> Try<UserResult<User, string list> seq, exn>
-    add: User -> Try<UserResult<int, string list>, exn>
-    delete: UserId -> Try<UserResult<unit, string list>, exn>
-    update: User -> Try<UserResult<unit, string list>, exn>
+type IUserRepository = {
+    byId: UserId -> Try<Async<DomainResult<User, string list>>, exn>
+    all: unit -> Try<Async<DomainResult<User, string list> seq>, exn>
+    add: User -> Try<Async<DomainResult<int, string>>, exn>
+    delete: UserId -> Try<Async<DomainResult<int, string>>, exn>
+    update: User -> Try<Async<DomainResult<int, string>>, exn>
 }
 
 let getUserById (id: UserId) =
     reader{
-        let! (r: UserRepository) = Reader.ask
-        return match r.byId id |> Try.run  with
-                | Ok user -> Result.Ok user
-                | Fail err when (err :? InvalidOperationException) -> NotFound err.Message |> Result.Error
-                | Fail err -> GenericError err.Message |> Result.Error
+        let! (r: IUserRepository) = Reader.ask
+        return r.byId id
     }
 
 let getAllUsers () =
     reader{
-        let! (r: UserRepository) = Reader.ask
-        return match r.all () |> Try.run with
-                | Ok user -> user |> Result.Ok
-                | Fail err when (err :? InvalidOperationException) -> NotFound err.Message |> Result.Error
-                | Fail err -> GenericError err.Message |> Result.Error
+        let! (r: IUserRepository) = Reader.ask
+        return r.all ()
     }
 
 let addUser (user: User) =
-    reader{
-        let! (r:UserRepository) = Reader.ask
-        return match r.add user |> Try.run with
-                | Ok user -> user |> Result.Ok
-                | Fail err when (err :? InvalidOperationException) -> RepositoryError err.Message |> Result.Error
-                | Fail err -> GenericError err.Message |> Result.Error
+     reader{
+        let! (r:IUserRepository) = Reader.ask
+        return r.add user
     }
 
 let deleteUser (id: UserId) =
     reader{
-        let! (r:UserRepository) = Reader.ask
-        return match r.delete id |> Try.run with
-                | Ok user -> user |> Result.Ok
-                | Fail err when (err :? InvalidOperationException) -> RepositoryError err.Message |> Result.Error
-                | Fail err -> GenericError err.Message |> Result.Error
+        let! (r:IUserRepository) = Reader.ask
+        return r.delete id
     }
 
 let updateUser (user: User) =
     reader{
-        let! (r:UserRepository) = Reader.ask
-        return match r.update user |> Try.run with
-                | Ok user -> user |> Result.Ok
-                | Fail err when (err :? InvalidOperationException) -> RepositoryError err.Message |> Result.Error
-                | Fail err -> GenericError err.Message |> Result.Error
+        let! (r:IUserRepository) = Reader.ask
+        return r.update user
     }
