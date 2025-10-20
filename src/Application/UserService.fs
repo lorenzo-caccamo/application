@@ -6,11 +6,11 @@ open Domain.DomainResult
 open Shared.Monads
 
 type IUserRepository = {
-    byId: UserId -> Try<Async<DomainResult<User, string list>>, exn>
-    all: unit -> Try<Async<DomainResult<User, string list> seq>, exn>
-    add: User -> Try<Async<DomainResult<int, string>>, exn>
-    delete: UserId -> Try<Async<DomainResult<int, string>>, exn>
-    update: User -> Try<Async<DomainResult<int, string>>, exn>
+    byId: UserId -> Try<DomainResult<User, string list>, exn>
+    all: unit -> Try<DomainResult<User list, string list>, exn>
+    add: User -> Try<DomainResult<int, string>, exn>
+    delete: UserId -> Try<DomainResult<int, string>, exn>
+    update: User -> Try<DomainResult<int, string>, exn>
 }
 
 let getUserById (id: UserId) =

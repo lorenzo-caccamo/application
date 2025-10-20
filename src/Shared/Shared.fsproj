@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Functions.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="Monads.fs" />
     <Content Include="paket.references" />

@@ -23,21 +23,18 @@ type UserProjection = {
     Role: string
 }
 
-type Response<'t> = {
-    Result : 't
-    Error : string
-}
+type Response<'t> = { Result: 't; Error: string list }
 
 type IUserService = {
-    userById: UserId -> Try<Async<DomainResult<User, string list>>, exn>
-    allUsers: unit -> Try<Async<DomainResult<User, string list> seq>, exn>
-    addUser: User -> Try<Async<DomainResult<int, string>>, exn>
-    deleteUser: UserId -> Try<Async<DomainResult<int, string>>, exn>
-    updateUser: User -> Try<Async<DomainResult<int, string>>, exn>
+    userById: UserId -> Try<DomainResult<User, string list>, exn>
+    allUsers: unit -> Try<DomainResult<User list, string list>, exn>
+    addUser: User -> Try<DomainResult<int, string>, exn>
+    deleteUser: UserId -> Try<DomainResult<int, string>, exn>
+    updateUser: User -> Try<DomainResult<int, string>, exn>
 }
 
 type IAppApi = {
-    getUsers: unit -> Async<Response<UserProjection seq>>
+    getUsers: unit -> Async<Response<UserProjection list>>
     getUserById: Guid -> Async<Response<UserProjection>>
     createUser: UserProjection -> Async<Response<int>>
     updateUser: UserProjection -> Async<Response<int>>
@@ -61,24 +58,48 @@ let createUserService (dbHndl: DbConHandler) =
         updateUser = fun user -> (updateUser user) |> Reader.run userRepo
     }
 
-let appApi (s: IUserService) (ctx:HttpContext)  = {
+let rec private toResponse (prj: UserProjection list) (err: string list) (lst: DomainResult<User, string list> list)   =
+    match lst with
+    | [] -> { Result = []; Error = [] }
+    | t1 :: tl when match t1 with
+                    | Successful v -> {
+                        Result = v :: toResponse prj err tl
+                        Error = err
+                        }
+                    | Invalid
+                    | NotFound err ->{
+                        Result = []
+                        Error = err
+                    }
+
+//  | NotFound err -> {Result = Seq.empty; Error = err}
+//                 | Invalid err ->
+//                 {Result = Seq.empty; Error = err}
+//                 )
+
+
+let appApi (s: IUserService) (ctx: HttpContext) = {
     getUsers =
         fun () -> async {
             match s.allUsers () |> Try.run with
             | Ok tryUsers ->
-                let res = tryUsers |> Async.RunSynchronously
-                res |> Seq.map (fun r ->
-                match r with
-                | Successful -> failwith ""
-                | NotFound -> failwith ""
-                 _ -> failwith ""
-                )
+                   return match tryUsers with
+                          | Successful _ -> { Result = Seq.empty; Error = [] }
+                          | NotFound err ->
+                            ctx.Response.StatusCode <- StatusCodes.Status404NotFound
+                            { Result = Seq.empty; Error = err }
+                          | Invalid err ->
+                            ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                            { Result = Seq.empty; Error = err }
+                          | _ ->
+                            ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                            { Result = Seq.empty; Error = ["Unexpected error"] }
 
             | Error err ->
                 ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
                 return {
                     Result = Seq.empty
-                    Error = $"Failed to retrieve all users. Internal messase: {err.InnerException}"
+                    Error = [ $"Failed to retrieve all users. Internal messase: {err.InnerException}" ]
                 }
 
         }
@@ -102,8 +123,7 @@ let private setConfig (config: IConfigurationRoot) =
     | None -> None
     | Some v -> Some v
 
-let webApp =
-    Api.make (createUserService (getAppConfig >> setConfig) |> appApi)
+let webApp = Api.make (createUserService (getAppConfig >> setConfig) |> appApi)
 
 let app = application {
     service_config (fun services ->
