@@ -1,14 +1,21 @@
 ﻿module Infrastructure.DbConnectionHandler
 
 open System.Data
+open FSharpPlus.Control
 open Microsoft.Data.SqlClient
+open Shared.Monads
 
 type DbConHandler =
-    val private conn : IDbConnection
-    private new(conn:IDbConnection) = {conn = conn}
+    val private conn : string
+    private new(conn:string) = {conn = conn}
     member this.Conn = this.conn
     static member Create(conn:string) =
-        let dbconn = new SqlConnection (conn)
-        match dbconn with
-        | null -> None
-        | v -> Some(DbConHandler v)
+        try
+            use dbconn = new SqlConnection (conn)
+            dbconn.Open()
+            Some(DbConHandler conn)
+        with
+        | _ -> None
+
+
+    member this.GetConnection() = new SqlConnection (this.conn)

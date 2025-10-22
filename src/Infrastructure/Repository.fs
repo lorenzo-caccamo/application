@@ -44,7 +44,6 @@ module Repository =
             | Normal -> Ok(User.Normal { Id = (Id user.Id); Data = data })
             | ReadOnly -> Ok(User.ReadOnly { Id = (Id user.Id); Data = data })
 
-
     let private createUserEntity (u: BaseUser) (role: Role) =
         let (Id id) = u.Id
 
@@ -62,104 +61,115 @@ module Repository =
         | User.Normal user -> createUserEntity user Normal
         | User.ReadOnly user -> createUserEntity user ReadOnly
 
-    let private toUserResult (res: Result<User list, string list>) =
-        match res with
-        | Error err -> Invalid(err)
-        | Ok v -> Successful(v)
-
-    let userById (hdr: DbConHandler) (userId: UserId) = tryM {
+    let userById (hdr: DbConHandler) (userId: UserId) = async {
         let (Id id) = userId
 
-        let usersEntity =
-            select {
-                for u in userTable do
-                    where (u.Id = id)
-                    orderBy u.Surname
-                    thenBy u.Name
-            }
-            |> hdr.Conn.SelectAsync<UserEntity>
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        use conn = hdr.GetConnection()
 
-        let users = usersEntity |> Seq.map toDomain
+        return tryM {
+            let usersEntity =
+                select {
+                    for u in userTable do
+                        where (u.Id = id)
+                        orderBy u.Surname
+                        thenBy u.Name
+                }
+                |> conn.SelectAsync<UserEntity>
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
 
-        return
-            match Seq.length users with
-            | 0 -> NotFound([ $"user with id {id} not found" ])
-            | 1 ->
-                match Seq.head users with
-                | Ok user -> Successful(user)
-                | Error err -> Invalid(err)
-            | _ -> Invalid([ $"too many users with id {id}" ])
+            let users = usersEntity |> Seq.map toDomain
+
+            return
+                match Seq.length users with
+                | 0 -> Error([ $"user with id {id} not found" ])
+                | 1 ->
+                    match Seq.head users with
+                    | Ok user -> Ok(user)
+                    | Error err -> Error(err)
+                | _ -> Error([ $"too many users with id {id}" ])
+        }
     }
 
-    let allUsers (hdr: DbConHandler) () = tryM {
-        let usersEntity =
-            select {
-                for u in userTable do
-                    selectAll
-            }
-            |> hdr.Conn.SelectAsync<UserEntity>
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+    let allUsers (hdr: DbConHandler) () = async {
+        use conn = hdr.GetConnection()
 
-        let maybeUsers =
-            (<!*>) (usersEntity |> Seq.map toDomain |> Seq.toList) |> toUserResult
+        return tryM {
+            let usersEntity =
+                select {
+                    for u in userTable do
+                        selectAll
+                }
+                |> conn.SelectAsync<UserEntity>
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
 
-        return maybeUsers
+            return (<!*>) (usersEntity |> Seq.map toDomain |> Seq.toList)
+        }
     }
 
-    let createUser (hdr: DbConHandler) (user: User) = tryM {
+    let createUser (hdr: DbConHandler) (user: User) = async {
         let usr = user |> toEntity
 
-        let inserted =
-            insert {
-                into userTable
-                value usr
-            }
-            |> hdr.Conn.InsertAsync<UserEntity>
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        use conn = hdr.GetConnection()
 
-        if inserted > 0 then
-            return Successful(inserted)
-        else
-            return FailToCreate("user not inserted")
+        return tryM {
+            let inserted =
+                insert {
+                    into userTable
+                    value usr
+                }
+                |> conn.InsertAsync<UserEntity>
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
+
+            if inserted > 0 then
+                return Ok(inserted)
+            else
+                return Error([ "user not inserted" ])
+        }
     }
 
-    let updateUser (hdr: DbConHandler) (user: User) = tryM {
+    let modifyUser (hdr: DbConHandler) (user: User) = async {
         let usr = user |> toEntity
 
-        let updated =
-            update {
-                for u in userTable do
-                    set usr
-                    where (u.Id = usr.Id)
-            }
-            |> hdr.Conn.UpdateAsync<UserEntity>
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        use conn = hdr.GetConnection()
 
-        if updated > 0 then
-            return Successful(updated)
-        else
-            return FailToUpdate("user not updated")
+        return tryM {
+            let updated =
+                update {
+                    for u in userTable do
+                        set usr
+                        where (u.Id = usr.Id)
+                }
+                |> conn.UpdateAsync<UserEntity>
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
+
+            if updated > 0 then
+                return Ok(updated)
+            else
+                return Error([ "user not updated" ])
+        }
     }
 
-    let deleteUser (hdr: DbConHandler) (userId: UserId) = tryM {
+    let removeUser (hdr: DbConHandler) (userId: UserId) = async {
         let (Id id) = userId
 
-        let deleted =
-            delete {
-                for u in userTable do
-                    where (u.Id = id)
-            }
-            |> hdr.Conn.DeleteAsync
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        use conn = hdr.GetConnection()
+        return tryM {
+            let deleted =
+                delete {
+                    for u in userTable do
+                        where (u.Id = id)
+                }
+                |> conn.DeleteAsync
+                |> Async.AwaitTask
+                |> Async.RunSynchronously
 
-        if deleted > 0 then
-            return Successful(deleted)
-        else
-            return FailToDelete("user not delete")
+            if deleted > 0 then
+                return Ok(deleted)
+            else
+                return Error([ "user not delete" ])
+        }
     }
