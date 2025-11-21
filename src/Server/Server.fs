@@ -49,74 +49,40 @@ let createUserService (dbHndl: DbConHandler) =
     }
 
 let appApi (us: UserService) (ctx: HttpContext) = {
-    getUsers = fun () -> async{
-        let! tryUsers = us.allUsers ()
-        match tryUsers |> Try.run with
-        | Ok res -> failwith "todo"
-        | Error err ->
-            ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
-            return {
-                Result = []
-                Error = [ $"Failed to retrieve all users. Internal messase: {err.InnerException}" ]
-            }
-
-    }
+    getUsers =
+        fun () -> async {
+            let! tryUsers = us.allUsers ()
+            match tryUsers |> Try.run with
+            | Ok res ->
+                match res with
+                | Ok usrLst ->
+                    ctx.Response.StatusCode <- StatusCodes.Status200OK
+                    return {
+                        Result = usrLst //map to userprojection
+                        Error = []
+                    }
+                | Error err ->
+                    ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                    return { Result = []; Error = err }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
+                return {
+                    Result = []
+                    Error = [ $"Failed to retrieve all users. Internal messase: {err.InnerException}" ]
+                }
+        }
     getUserById = failwith "todo"
     createUser = failwith "todo"
     updateUser = failwith "todo"
     deleteUserById = failwith "todo"
 }
-// let appApi (s: IUserService) (ctx: HttpContext) = {
-//     // getUsers =
-//     //     fun () -> async {
-//     //         tryM{
-//     //             let! users = s.allUsers ()
-//     //             let res = match users with
-//     //                         | Successful _ -> { Result = Seq.empty; Error = [] }
-//     //                         | NotFound err ->
-//     //                          ctx.Response.StatusCode <- StatusCodes.Status404NotFound
-//     //                          { Result = Seq.empty; Error = err }
-//     //                         | Invalid err ->
-//     //                          ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-//     //                          { Result = Seq.empty; Error = err }
-//     //                         | _ ->
-//     //                          ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-//     //                          { Result = Seq.empty; Error = ["Unexpected error"] }
-//     //             return res
-//     //         }
-//             // match s.allUsers () |> Try.run with
-//             // | Ok tryUsers ->
-//             //        return match tryUsers with
-//             //               | Successful _ -> { Result = Seq.empty; Error = [] }
-//             //               | NotFound err ->
-//             //                 ctx.Response.StatusCode <- StatusCodes.Status404NotFound
-//             //                 { Result = Seq.empty; Error = err }
-//             //               | Invalid err ->
-//             //                 ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-//             //                 { Result = Seq.empty; Error = err }
-//             //               | _ ->
-//             //                 ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-//             //                 { Result = Seq.empty; Error = ["Unexpected error"] }
-//             //
-//             // | Error err ->
-//             //     ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
-//             //     return {
-//             //         Result = Seq.empty
-//             //         Error = [ $"Failed to retrieve all users. Internal messase: {err.InnerException}" ]
-//             //     }
-//
-//         }
-//     getUserById = failwith "todo"
-//     createUser = failwith "todo"
-//     updateUser = failwith "todo"
-//     deleteUserById = failwith "todo"
-//     }
+
 
 let private getAppConfig () =
-        ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("Properties/appsettings.json", optional = false, reloadOnChange = true)
-            .Build()
+    ConfigurationBuilder()
+        .SetBasePath(Directory.GetCurrentDirectory())
+        .AddJsonFile("Properties/appsettings.json", optional = false, reloadOnChange = true)
+        .Build()
 
 let private setConfig (config: IConfigurationRoot) =
     let connstrg = config.GetSection("dbconnection").Value
@@ -130,7 +96,7 @@ let webApp = Api.make (createUserService (getAppConfig >> setConfig) |> appApi)
 
 let app = application {
     service_config (fun services ->
-            services.AddSingleton<IHostedService>(fun sp ->
+        services.AddSingleton<IHostedService>(fun sp ->
             let lifetime = sp.GetRequiredService<IHostApplicationLifetime>()
             let conf = (getAppConfig >> setConfig) ()
 

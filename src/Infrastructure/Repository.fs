@@ -2,7 +2,6 @@
 
 open System
 open Domain
-open Domain.DomainResult
 open Dapper.FSharp.MSSQL
 open Infrastructure.DbConnectionHandler
 open Shared.Monads

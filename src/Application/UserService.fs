@@ -43,7 +43,7 @@ let getAllUsers () = reader {
     return r.all ()
 }
 
-let addUser (user: UserProjection) = reader {
+let addUser (user: UserProjection) = reader { // TODO Id must not be mapped
     let! (r: IUserRepository) = Reader.ask
     return
         match map user with
