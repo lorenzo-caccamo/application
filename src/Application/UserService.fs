@@ -3,7 +3,7 @@
 open System
 open Domain
 open Shared.Monads
-open Domain.UserProjection
+open UserProjection
 
 type IUserRepository = {
     byId: UserId -> Async<Try<Result<User, string list>, exn>>
@@ -28,8 +28,8 @@ let private map (user: UserProjection) : Result<User, string list> =
     match maybeUsrData with
     | Ok u ->
         match user.Role with
-        | Admin -> Ok(User.Admin { Id = Id user.Id; Data = u })
-        | Normal -> Ok(User.Normal { Id = Id user.Id; Data = u })
+        | Administrator -> Ok(User.Admin { Id = Id user.Id; Data = u })
+        | NormalUser -> Ok(User.Normal { Id = Id user.Id; Data = u })
         | Readonly -> Ok(User.ReadOnly { Id = Id user.Id; Data = u })
     | Error err -> Error err
 

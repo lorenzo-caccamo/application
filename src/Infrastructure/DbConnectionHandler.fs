@@ -1,9 +1,6 @@
 ﻿module Infrastructure.DbConnectionHandler
 
-open System.Data
-open FSharpPlus.Control
 open Microsoft.Data.SqlClient
-open Shared.Monads
 
 type DbConHandler =
     val private conn : string
@@ -16,6 +13,4 @@ type DbConHandler =
             Some(DbConHandler conn)
         with
         | _ -> None
-
-
     member this.GetConnection() = new SqlConnection (this.conn)

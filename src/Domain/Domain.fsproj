@@ -6,8 +6,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="User.fs" />
         <Compile Include="UserProjection.fs" />
+        <Compile Include="User.fs" />
     </ItemGroup>
 
 </Project>

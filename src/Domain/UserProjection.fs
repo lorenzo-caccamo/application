@@ -1,8 +1,8 @@
-﻿module Domain.UserProjection
+﻿module UserProjection
 
 open System
 
-type Roles = Admin | Normal | Readonly
+type Roles = Administrator | NormalUser | Readonly
 
 type UserProjection = {
     Id : Guid

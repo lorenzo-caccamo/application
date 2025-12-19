@@ -8,10 +8,12 @@ open SAFE
 open Saturn
 open Shared.Monads
 open Domain
-open Domain.UserProjection
+open UserProjection
 open Infrastructure.Repository
 open Application.UserService
 open Infrastructure.DbConnectionHandler
+open Mappers
+open Microsoft.Extensions.DependencyInjection
 
 type Response<'t> = { Result: 't; Error: string list }
 
@@ -23,7 +25,7 @@ type UserService = {
     updateUser: UserProjection -> Async<Try<Result<int, string list>, exn>>
 }
 
-type IAppApi = {
+type AppApi = {
     getUsers: unit -> Async<Response<UserProjection list>>
     getUserById: Guid -> Async<Response<UserProjection>>
     createUser: UserProjection -> Async<Response<int>>
@@ -52,13 +54,14 @@ let appApi (us: UserService) (ctx: HttpContext) = {
     getUsers =
         fun () -> async {
             let! tryUsers = us.allUsers ()
+
             match tryUsers |> Try.run with
             | Ok res ->
                 match res with
                 | Ok usrLst ->
                     ctx.Response.StatusCode <- StatusCodes.Status200OK
                     return {
-                        Result = usrLst //map to userprojection
+                        Result = usrLst |> List.map toUserPrj
                         Error = []
                     }
                 | Error err ->
@@ -86,36 +89,26 @@ let private getAppConfig () =
 
 let private setConfig (config: IConfigurationRoot) =
     let connstrg = config.GetSection("dbconnection").Value
-    let maybeDbHndl = DbConHandler.Validate(connstrg)
-
-    match maybeDbHndl with
+    match DbConHandler.Create(connstrg) with
     | None -> None
-    | Some v -> Some v
+    | Some hndl -> Some hndl
 
-let webApp = Api.make (createUserService (getAppConfig >> setConfig) |> appApi)
-
-let app = application {
-    service_config (fun services ->
-        services.AddSingleton<IHostedService>(fun sp ->
-            let lifetime = sp.GetRequiredService<IHostApplicationLifetime>()
-            let conf = (getAppConfig >> setConfig) ()
-
-            match conf with
-            | None ->
-                printfn "Missing or invalid connection string. Shutting down..."
-                lifetime.StopApplication()
-            | Some v -> v |> ignore
-
-            null // no hosted service needed
-        ))
-
-    use_router webApp
-    memory_cache
-    use_static "public"
-    use_gzip
-}
+let private webApp (hndl: DbConHandler) = Api.make (createUserService hndl |> appApi)
 
 [<EntryPoint>]
 let main _ =
-    run app
-    0
+    let config = getAppConfig ()
+    match setConfig config with
+    | None ->
+        printfn "Missing or invalid connection string. Shutting down..."
+        1
+    | Some hndl ->
+        let app = application{
+                service_config (fun services ->
+                services.AddEndpointsApiExplorer().AddSwaggerGen())
+                use_router (webApp hndl)
+                memory_cache
+                use_gzip
+        }
+        run app
+        0

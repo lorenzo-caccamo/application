@@ -6,22 +6,25 @@
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="paket.references"/>
-        <Compile Include="Server.fs"/>
+        <Compile Include="Mappers.fs" />
+        <None Include="paket.references" />
+        <Compile Include="Server.fs" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\Application\Application.fsproj"/>
-        <ProjectReference Include="..\Domain\Domain.fsproj"/>
-        <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj"/>
-        <ProjectReference Include="..\Shared\Shared.fsproj"/>
+        <ProjectReference Include="..\Application\Application.fsproj" />
+        <ProjectReference Include="..\Domain\Domain.fsproj" />
+        <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj" />
+        <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="FSharpPlus" Version="1.7.0"/>
+        <PackageReference Include="FSharpPlus" Version="1.7.0" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.1" />
     </ItemGroup>
     <ItemGroup>
         <None Update="Properties\appsettings.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
-    <Import Project="..\..\.paket\Paket.Restore.targets"/>
+    <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
