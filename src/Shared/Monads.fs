@@ -45,7 +45,7 @@ type TryBuilder() =
     member _.Zero() = Try.liftOk ()
     member _.Delay(f) = f ()
 
-let tryM = TryBuilder()
+let tryS = TryBuilder()
 
 type Reader<'env, 'a> = Reader of action: ('env -> 'a)
 
@@ -84,28 +84,58 @@ let (<!>) t1 t2 =
         | Ok _ -> Error err
         | Error err2 -> Error(err2 @ err)
 
+type TryA<'r, 'err> = TryA of predicate: (unit -> Async<Result<'r, 'err>>)
 
-type TryAsync<'a> = TryAsync of Try<Async<'a>, exn>
+module TryA =
+    let run (TryA f) = async {
+        try
+            return! f ()
+        with ex ->
+            return Error ex
+    }
 
-module TryAsync =
-    let run (TryAsync m) = m
-    let bind (f: Async<'a> -> Try<Async<'b>, exn>) (a: TryAsync<'a>) =
-        TryAsync(
-            let b = run a
-            match b |> Try.run with
-            | Ok ok -> f  ok
-            | Error err -> Try.liftErr err
-        )
+    let bind f a =
+        TryA(fun () -> async {
+            let! res = run a
 
-    // let inline hoist (x: 'a option) : OptionT<'``Monad<option<'a>>``> = x |> result |> OptionT
-    let hoist (a: Async<'a>) = a |> Try.liftOk
+            return!
+                match res with
+                | Ok ok -> run (f ok)
+                | Error err -> async { return Error err }
+        })
 
-type TryAsyncBuilder() =
-    member _.Return(x) = TryAsync x
-    member _.ReturnFrom(x) =  x
-    member _.Bind(x, f) = TryAsync.bind f x
-    member _.Zero() =
-        TryAsync(Try(fun () -> Result.Ok(async.Return())))
+    let liftOk a = TryA(fun () -> async { return Ok a })
 
-// the builder instance
-let tryAsync = TryAsyncBuilder()
+type TryABuilder() =
+    member _.Return(x) = TryA.liftOk (x)
+    member _.ReturnFrom(x) = x
+    member _.Bind(x, f) = TryA.bind f x
+
+let tryA = TryABuilder()
+
+
+
+// type TryAsync<'a> = TryAsync of Try<Async<'a>, exn>
+//
+// module TryAsync =
+//     let run (TryAsync m) = m
+//     let bind (f: Async<'a> -> Try<Async<'b>, exn>) (a: TryAsync<'a>) =
+//         TryAsync(
+//             let b = run a
+//             match b |> Try.run with
+//             | Ok ok -> f  ok
+//             | Error err -> Try.liftErr err
+//         )
+//
+//     // let inline hoist (x: 'a option) : OptionT<'``Monad<option<'a>>``> = x |> result |> OptionT
+//     let hoist (a: Async<'a>) = a |> Try.liftOk
+//
+// type TryAsyncBuilder() =
+//     member _.Return(x) = TryAsync x
+//     member _.ReturnFrom(x) =  x
+//     member _.Bind(x, f) = TryAsync.bind f x
+//     member _.Zero() =
+//         TryAsync(Try(fun () -> Result.Ok(async.Return())))
+//
+// // the builder instance
+// let tryAsync = TryAsyncBuilder()
