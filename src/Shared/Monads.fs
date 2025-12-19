@@ -83,3 +83,19 @@ let (<!>) t1 t2 =
         match t2 with
         | Ok _ -> Error err
         | Error err2 -> Error(err2 @ err)
+
+
+type AsyncTry<'a> = AsyncTry of Try<Async<'a>, exn>
+
+module AsyncTry =
+    let run (AsyncTry m) = m
+
+    // ``AsyncT<'a>`` -> 'a -> ``AsyncT<'b>>`` -> ``Async<'b>``
+    let inline bind (f:Async<'a> -> Try<Async<'b>, exn>) (a: AsyncTry<'a>) =
+        AsyncTry(
+                let b = run a
+                match b |> Try.run with
+                | Ok ok -> f ok
+                | Error err -> Try.liftErr err
+            )
+
