@@ -83,3 +83,29 @@ let (<!>) t1 t2 =
         match t2 with
         | Ok _ -> Error err
         | Error err2 -> Error(err2 @ err)
+
+
+type TryAsync<'a> = TryAsync of Try<Async<'a>, exn>
+
+module TryAsync =
+    let run (TryAsync m) = m
+    let bind (f: Async<'a> -> Try<Async<'b>, exn>) (a: TryAsync<'a>) =
+        TryAsync(
+            let b = run a
+            match b |> Try.run with
+            | Ok ok -> f  ok
+            | Error err -> Try.liftErr err
+        )
+
+    // let inline hoist (x: 'a option) : OptionT<'``Monad<option<'a>>``> = x |> result |> OptionT
+    let hoist (a: Async<'a>) = a |> Try.liftOk
+
+type TryAsyncBuilder() =
+    member _.Return(x) = TryAsync x
+    member _.ReturnFrom(x) =  x
+    member _.Bind(x, f) = TryAsync.bind f x
+    member _.Zero() =
+        TryAsync(Try(fun () -> Result.Ok(async.Return())))
+
+// the builder instance
+let tryAsync = TryAsyncBuilder()
