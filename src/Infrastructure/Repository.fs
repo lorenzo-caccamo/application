@@ -90,6 +90,45 @@ module Repository =
         }
     }
 
+
+    let userById_ (hdr: DbConHandler) (userId: UserId) : Async<Try<Async<Result<User, string list>>, exn>> = async {
+        let (Id id) = userId
+        use conn = hdr.GetConnection()
+
+        let p =
+            tryAsync {
+                let! usersEntity =
+                    Try.liftOk (
+                        select {
+                            for u in userTable do
+                            where (u.Id = id)
+                            orderBy u.Surname
+                            thenBy u.Name
+                        }
+                        |> conn.SelectAsync<UserEntity>
+                        |> Async.AwaitTask
+                    )
+                    |> TryAsync
+
+                let x =
+                    async {
+                        let! users = usersEntity
+
+                        return match users |> Seq.map toDomain |> Seq.tryExactlyOne with
+                                | None ->
+                                    Error [ $"user with id {id} not found or multiple records found" ]
+                                | Some (Ok user) ->
+                                    Ok user
+                                | Some (Error err) ->
+                                    Error err
+                    }
+                    |> TryAsync.hoist
+                return! x
+            }
+        return p |> TryAsync.run
+    }
+
+
     let allUsers (hdr: DbConHandler) () = async {
         use conn = hdr.GetConnection()
 
@@ -156,6 +195,7 @@ module Repository =
         let (Id id) = userId
 
         use conn = hdr.GetConnection()
+
         return tryM {
             let deleted =
                 delete {
