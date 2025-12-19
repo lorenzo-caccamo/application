@@ -65,7 +65,7 @@ module Repository =
 
         use conn = hdr.GetConnection()
 
-        return tryM {
+        return tryS {
             let usersEntity =
                 select {
                     for u in userTable do
@@ -77,62 +77,58 @@ module Repository =
                 |> Async.AwaitTask
                 |> Async.RunSynchronously
 
-            let users = usersEntity |> Seq.map toDomain
+            let users = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
 
             return
-                match Seq.length users with
-                | 0 -> Error([ $"user with id {id} not found" ])
-                | 1 ->
-                    match Seq.head users with
+                match users with
+                | None -> Error([ $"too many users with id {id}" ])
+                | Some value ->
+                    match value with
                     | Ok user -> Ok(user)
                     | Error err -> Error(err)
-                | _ -> Error([ $"too many users with id {id}" ])
         }
     }
 
 
-    let userById_ (hdr: DbConHandler) (userId: UserId) : Async<Try<Async<Result<User, string list>>, exn>> = async {
+    let userById_ (hdr: DbConHandler) (userId: UserId) =
         let (Id id) = userId
         use conn = hdr.GetConnection()
 
-        let p =
-            tryAsync {
-                let! usersEntity =
-                    Try.liftOk (
-                        select {
-                            for u in userTable do
-                            where (u.Id = id)
-                            orderBy u.Surname
-                            thenBy u.Name
-                        }
-                        |> conn.SelectAsync<UserEntity>
-                        |> Async.AwaitTask
-                    )
-                    |> TryAsync
+        tryA {
+            let res =
+                select {
+                    for u in userTable do
+                        where (u.Id = id)
+                        orderBy u.Surname
+                        thenBy u.Name
+                }
+                |> conn.SelectAsync<UserEntity>
+                |> Async.AwaitTask
 
-                let x =
-                    async {
-                        let! users = usersEntity
+            let c = async {
+                let! usersEntity = res
+                let users = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
 
-                        return match users |> Seq.map toDomain |> Seq.tryExactlyOne with
-                                | None ->
-                                    Error [ $"user with id {id} not found or multiple records found" ]
-                                | Some (Ok user) ->
-                                    Ok user
-                                | Some (Error err) ->
-                                    Error err
-                    }
-                    |> TryAsync.hoist
-                return! x
+                return
+                    match users with
+                    | None -> Error([ $"too many users with id {id}" ])
+                    | Some value ->
+                        match value with
+                        | Ok user -> Ok(user)
+                        | Error err -> Error(err)
             }
-        return p |> TryAsync.run
-    }
+
+            return c
+        }
+
+
+
 
 
     let allUsers (hdr: DbConHandler) () = async {
         use conn = hdr.GetConnection()
 
-        return tryM {
+        return tryS {
             let usersEntity =
                 select {
                     for u in userTable do
@@ -151,7 +147,7 @@ module Repository =
 
         use conn = hdr.GetConnection()
 
-        return tryM {
+        return tryS {
             let inserted =
                 insert {
                     into userTable
@@ -173,7 +169,7 @@ module Repository =
 
         use conn = hdr.GetConnection()
 
-        return tryM {
+        return tryS {
             let updated =
                 update {
                     for u in userTable do
@@ -196,7 +192,7 @@ module Repository =
 
         use conn = hdr.GetConnection()
 
-        return tryM {
+        return tryS {
             let deleted =
                 delete {
                     for u in userTable do
