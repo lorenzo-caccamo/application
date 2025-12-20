@@ -91,7 +91,7 @@ module TryA =
         try
             let! res = f()
             return res
-        with ex -> return (Error ex.Message)
+        with ex -> return (Error [ex.Message])
     }
 
     let bind f a =

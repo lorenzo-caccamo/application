@@ -128,7 +128,7 @@ let ``should return result when async ok_computational express`` () =
         return
             (async {
                 do! Async.Sleep(2000)
-                return Error("job completed successfully")
+                return Error(["job completed successfully"])
             })
     }
 

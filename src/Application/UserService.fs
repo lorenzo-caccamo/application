@@ -6,11 +6,11 @@ open Shared.Monads
 open UserProjection
 
 type IUserRepository = {
-    byId: UserId -> Async<TryS<Result<User, string list>, exn>>
-    all: unit -> Async<TryS<Result<User list, string list>, exn>>
-    add: User -> Async<TryS<Result<int, string list>, exn>>
-    delete: UserId -> Async<TryS<Result<int, string list>, exn>>
-    update: User -> Async<TryS<Result<int, string list>, exn>>
+    byId: UserId -> TryA<User, string list>
+    all: unit -> TryA<User list, string list>
+    add: User -> TryA<int, string list>
+    delete: UserId -> TryA<int, string list>
+    update: User -> TryA<int, string list>
 }
 
 let private createUserData email firstName surname : UserData = {
@@ -45,10 +45,11 @@ let getAllUsers () = reader {
 
 let addUser (user: UserProjection) = reader { // TODO Id must not be mapped
     let! (r: IUserRepository) = Reader.ask
+
     return
         match map user with
         | Ok u -> r.add u
-        | Error err -> async { return TryS.liftOk (Error err) }
+        | Error err -> TryA(fun () -> async { return Error err })
 }
 
 let deleteUser (id: Guid) = reader {
@@ -58,8 +59,9 @@ let deleteUser (id: Guid) = reader {
 
 let updateUser (user: UserProjection) = reader {
     let! (r: IUserRepository) = Reader.ask
+
     return
         match map user with
         | Ok u -> r.update u
-        | Error err -> async { return TryS.liftOk (Error err) }
+        | Error err -> TryA(fun () -> async { return Error err })
 }

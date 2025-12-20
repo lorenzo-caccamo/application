@@ -18,11 +18,11 @@ open Microsoft.Extensions.DependencyInjection
 type Response<'t> = { Result: 't; Error: string list }
 
 type UserService = {
-    userById: Guid -> Async<TryS<Result<User, string list>, exn>>
-    allUsers: unit -> Async<TryS<Result<User list, string list>, exn>>
-    addUser: UserProjection -> Async<TryS<Result<int, string list>, exn>>
-    deleteUser: Guid -> Async<TryS<Result<int, string list>, exn>>
-    updateUser: UserProjection -> Async<TryS<Result<int, string list>, exn>>
+    userById: Guid -> TryA<User, string list>
+    allUsers: unit -> TryA<User list, string list>
+    addUser: UserProjection -> TryA<int, string list>
+    deleteUser: Guid -> TryA<int, string list>
+    updateUser: UserProjection -> TryA<int, string list>
 }
 
 type AppApi = {
@@ -53,26 +53,17 @@ let createUserService (dbHndl: DbConHandler) =
 let appApi (us: UserService) (ctx: HttpContext) = {
     getUsers =
         fun () -> async {
-            let! tryUsers = us.allUsers ()
+            let! users = us.allUsers () |> TryA.run
 
-            match tryUsers |> TryS.run with
+            match users with
             | Ok res ->
-                match res with
-                | Ok usrLst ->
-                    ctx.Response.StatusCode <- StatusCodes.Status200OK
-                    return {
-                        Result = usrLst |> List.map toUserPrj
-                        Error = []
-                    }
-                | Error err ->
-                    ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-                    return { Result = []; Error = err }
-            | Error err ->
-                ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
                 return {
-                    Result = []
-                    Error = [ $"Failed to retrieve all users. Internal messase: {err.InnerException}" ]
+                    Result = res |> List.map toUserPrj
+                    Error = []
                 }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                return { Result = []; Error = err }
         }
     getUserById = failwith "todo"
     createUser = failwith "todo"
@@ -89,26 +80,29 @@ let private getAppConfig () =
 
 let private setConfig (config: IConfigurationRoot) =
     let connstrg = config.GetSection("dbconnection").Value
+
     match DbConHandler.Create(connstrg) with
     | None -> None
     | Some hndl -> Some hndl
 
-let private webApp (hndl: DbConHandler) = Api.make (createUserService hndl |> appApi)
+let private webApp (hndl: DbConHandler) =
+    Api.make (createUserService hndl |> appApi)
 
 [<EntryPoint>]
 let main _ =
     let config = getAppConfig ()
+
     match setConfig config with
     | None ->
         printfn "Missing or invalid connection string. Shutting down..."
         1
     | Some hndl ->
-        let app = application{
-                service_config (fun services ->
-                services.AddEndpointsApiExplorer().AddSwaggerGen())
-                use_router (webApp hndl)
-                memory_cache
-                use_gzip
+        let app = application {
+            service_config (fun services -> services.AddEndpointsApiExplorer().AddSwaggerGen())
+            use_router (webApp hndl)
+            memory_cache
+            use_gzip
         }
+
         run app
         0
