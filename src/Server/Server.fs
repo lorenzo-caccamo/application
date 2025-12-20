@@ -18,11 +18,11 @@ open Microsoft.Extensions.DependencyInjection
 type Response<'t> = { Result: 't; Error: string list }
 
 type UserService = {
-    userById: Guid -> Async<Try<Result<User, string list>, exn>>
-    allUsers: unit -> Async<Try<Result<User list, string list>, exn>>
-    addUser: UserProjection -> Async<Try<Result<int, string list>, exn>>
-    deleteUser: Guid -> Async<Try<Result<int, string list>, exn>>
-    updateUser: UserProjection -> Async<Try<Result<int, string list>, exn>>
+    userById: Guid -> Async<TryS<Result<User, string list>, exn>>
+    allUsers: unit -> Async<TryS<Result<User list, string list>, exn>>
+    addUser: UserProjection -> Async<TryS<Result<int, string list>, exn>>
+    deleteUser: Guid -> Async<TryS<Result<int, string list>, exn>>
+    updateUser: UserProjection -> Async<TryS<Result<int, string list>, exn>>
 }
 
 type AppApi = {
@@ -55,7 +55,7 @@ let appApi (us: UserService) (ctx: HttpContext) = {
         fun () -> async {
             let! tryUsers = us.allUsers ()
 
-            match tryUsers |> Try.run with
+            match tryUsers |> TryS.run with
             | Ok res ->
                 match res with
                 | Ok usrLst ->

@@ -77,37 +77,35 @@ module Repository =
                 |> Async.AwaitTask
                 |> Async.RunSynchronously
 
-            let users = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
+            let tryUser = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
 
             return
-                match users with
+                match tryUser with
                 | None -> Error([ $"too many users with id {id}" ])
-                | Some value ->
-                    match value with
-                    | Ok user -> Ok(user)
-                    | Error err -> Error(err)
+                | Some user ->
+                    match user with
+                    | Ok u -> Ok u
+                    | Error err -> Error err
         }
     }
-
 
     let userById_ (hdr: DbConHandler) (userId: UserId) =
         let (Id id) = userId
         use conn = hdr.GetConnection()
 
         tryA {
-            let res =
-                select {
-                    for u in userTable do
-                        where (u.Id = id)
-                        orderBy u.Surname
-                        thenBy u.Name
-                }
-                |> conn.SelectAsync<UserEntity>
-                |> Async.AwaitTask
+            return async {
+                let! res =
+                    select {
+                        for u in userTable do
+                            where (u.Id = id)
+                            orderBy u.Surname
+                            thenBy u.Name
+                    }
+                    |> conn.SelectAsync<UserEntity>
+                    |> Async.AwaitTask
 
-            let c = async {
-                let! usersEntity = res
-                let users = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
+                let users = res |> Seq.map toDomain |> Seq.tryExactlyOne
 
                 return
                     match users with
@@ -117,13 +115,7 @@ module Repository =
                         | Ok user -> Ok(user)
                         | Error err -> Error(err)
             }
-
-            return c
         }
-
-
-
-
 
     let allUsers (hdr: DbConHandler) () = async {
         use conn = hdr.GetConnection()
@@ -142,9 +134,25 @@ module Repository =
         }
     }
 
+    let allUsers_ (hdr: DbConHandler) () =
+        use conn = hdr.GetConnection()
+
+        tryA {
+            return async {
+                let! usersEntity =
+                    select {
+                        for u in userTable do
+                            selectAll
+                    }
+                    |> conn.SelectAsync<UserEntity>
+                    |> Async.AwaitTask
+
+                return (<!*>) (usersEntity |> Seq.map toDomain |> Seq.toList)
+            }
+        }
+
     let createUser (hdr: DbConHandler) (user: User) = async {
         let usr = user |> toEntity
-
         use conn = hdr.GetConnection()
 
         return tryS {
@@ -164,47 +172,69 @@ module Repository =
         }
     }
 
-    let modifyUser (hdr: DbConHandler) (user: User) = async {
+    let createUser_ (hdr: DbConHandler) (user: User) =
         let usr = user |> toEntity
-
         use conn = hdr.GetConnection()
 
-        return tryS {
-            let updated =
-                update {
-                    for u in userTable do
-                        set usr
-                        where (u.Id = usr.Id)
-                }
-                |> conn.UpdateAsync<UserEntity>
-                |> Async.AwaitTask
-                |> Async.RunSynchronously
+        tryA {
+            return async {
+                let inserted =
+                    insert {
+                        into userTable
+                        value usr
+                    }
+                    |> conn.InsertAsync<UserEntity>
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
 
-            if updated > 0 then
-                return Ok(updated)
-            else
-                return Error([ "user not updated" ])
+                if inserted > 0 then
+                    return Ok(inserted)
+                else
+                    return Error([ "user not inserted" ])
+            }
         }
-    }
 
-    let removeUser (hdr: DbConHandler) (userId: UserId) = async {
+    let modifyUser (hdr: DbConHandler) (user: User) =
+        let usr = user |> toEntity
+        use conn = hdr.GetConnection()
+
+        tryA {
+            return async {
+                let updated =
+                    update {
+                        for u in userTable do
+                            set usr
+                            where (u.Id = usr.Id)
+                    }
+                    |> conn.UpdateAsync<UserEntity>
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
+
+                if updated > 0 then
+                    return Ok(updated)
+                else
+                    return Error([ "user not updated" ])
+            }
+        }
+
+    let removeUser (hdr: DbConHandler) (userId: UserId) =
         let (Id id) = userId
-
         use conn = hdr.GetConnection()
 
-        return tryS {
-            let deleted =
-                delete {
-                    for u in userTable do
-                        where (u.Id = id)
-                }
-                |> conn.DeleteAsync
-                |> Async.AwaitTask
-                |> Async.RunSynchronously
+        tryA {
+            return async {
+                let deleted =
+                    delete {
+                        for u in userTable do
+                            where (u.Id = id)
+                    }
+                    |> conn.DeleteAsync
+                    |> Async.AwaitTask
+                    |> Async.RunSynchronously
 
-            if deleted > 0 then
-                return Ok(deleted)
-            else
-                return Error([ "user not delete" ])
+                if deleted > 0 then
+                    return Ok(deleted)
+                else
+                    return Error([ "user not delete" ])
+            }
         }
-    }
