@@ -60,35 +60,6 @@ module Repository =
         | User.Normal user -> createUserEntity user Normal
         | User.ReadOnly user -> createUserEntity user ReadOnly
 
-    // let userById (hdr: DbConHandler) (userId: UserId) = async {
-    //     let (Id id) = userId
-    //
-    //     use conn = hdr.GetConnection()
-    //
-    //     return tryS {
-    //         let usersEntity =
-    //             select {
-    //                 for u in userTable do
-    //                     where (u.Id = id)
-    //                     orderBy u.Surname
-    //                     thenBy u.Name
-    //             }
-    //             |> conn.SelectAsync<UserEntity>
-    //             |> Async.AwaitTask
-    //             |> Async.RunSynchronously
-    //
-    //         let tryUser = usersEntity |> Seq.map toDomain |> Seq.tryExactlyOne
-    //
-    //         return
-    //             match tryUser with
-    //             | None -> Error([ $"too many users with id {id}" ])
-    //             | Some user ->
-    //                 match user with
-    //                 | Ok u -> Ok u
-    //                 | Error err -> Error err
-    //     }
-    // }
-
     let userById (hdr: DbConHandler) (userId: UserId) =
         let (Id id) = userId
         use conn = hdr.GetConnection()
@@ -117,23 +88,6 @@ module Repository =
             }
         }
 
-    // let allUsers (hdr: DbConHandler) () = async {
-    //     use conn = hdr.GetConnection()
-    //
-    //     return tryS {
-    //         let usersEntity =
-    //             select {
-    //                 for u in userTable do
-    //                     selectAll
-    //             }
-    //             |> conn.SelectAsync<UserEntity>
-    //             |> Async.AwaitTask
-    //             |> Async.RunSynchronously
-    //
-    //         return (<!*>) (usersEntity |> Seq.map toDomain |> Seq.toList)
-    //     }
-    // }
-
     let allUsers (hdr: DbConHandler) () =
         use conn = hdr.GetConnection()
 
@@ -150,27 +104,6 @@ module Repository =
                 return (<!*>) (usersEntity |> Seq.map toDomain |> Seq.toList)
             }
         }
-
-    // let createUser (hdr: DbConHandler) (user: User) = async {
-    //     let usr = user |> toEntity
-    //     use conn = hdr.GetConnection()
-    //
-    //     return tryS {
-    //         let inserted =
-    //             insert {
-    //                 into userTable
-    //                 value usr
-    //             }
-    //             |> conn.InsertAsync<UserEntity>
-    //             |> Async.AwaitTask
-    //             |> Async.RunSynchronously
-    //
-    //         if inserted > 0 then
-    //             return Ok(inserted)
-    //         else
-    //             return Error([ "user not inserted" ])
-    //     }
-    // }
 
     let createUser (hdr: DbConHandler) (user: User) =
         let usr = user |> toEntity
