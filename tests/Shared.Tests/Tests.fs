@@ -21,7 +21,7 @@ let ``should return Ok`` () =
     (res |> run) |> getTaggedTypeName |> should equal "Ok"
 
 [<Fact>]
-let ``should return Fail`` () =
+let ``should return Error`` () =
     //Arrange
     let str = ""
     let tryParse s = TryS(fun () -> Ok(s |> int))
@@ -34,7 +34,7 @@ let ``should return Fail`` () =
     (res |> run) |> getTaggedTypeName |> should equal "Error"
 
 [<Fact>]
-let ``should return Fail when string "0"`` () =
+let ``should return Error when string "0"`` () =
     //Arrange
     let str = "0"
     let tryParse s = TryS(fun () -> Ok(s |> int))
@@ -47,7 +47,7 @@ let ``should return Fail when string "0"`` () =
     (res |> run) |> getTaggedTypeName |> should equal "Error"
 
 [<Fact>]
-let ``should return Fail when string "0" computational expression`` () =
+let ``should return Error when string "0" computational expression`` () =
     //Arrange
     let str = "0"
     let tryParse s = TryS(fun () -> Ok(s |> int))
@@ -64,9 +64,9 @@ let ``should return Fail when string "0" computational expression`` () =
     (res |> run) |> Result.isError |> should equal true
 
 [<Fact>]
-let ``should return error when async fails`` () =
+let ``should return Error when async fails`` () =
     //Arrange
-    let doSome =
+    let tryDoSomething =
         TryA(fun () -> async {
             do! Async.Sleep(2000)
             failwith "unexpected error"
@@ -74,7 +74,7 @@ let ``should return error when async fails`` () =
         })
 
     //Act
-    let res = doSome |> TryA.run
+    let res = tryDoSomething |> TryA.run
 
     //Assert
     async {
