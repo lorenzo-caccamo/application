@@ -2,21 +2,6 @@
 
 type TryS<'r, 'err> = TryS of predicate: (unit -> Result<'r, 'err>)
 
-// type TryT<'r, 'err> = TryT of Try<Async<'r>, Async<'err>>
-
-// module TryT =
-//
-//     let inline run (TryT f) = f
-
-// let inline bind (f: 't -> '``OutM<Try<'r, 'err>>>``) (a: TryT<'``OutM<Try<'t, 'err>>``>) =
-//     f (run a) |> TryT
-
-(*Examples
-let tryParse (str: string) = Try(fun () -> Ok(str |> int))
-let tryDivide (num: int) = Try(fun () -> Ok(1/num))
-let res (str: string) = (tryParse str) |> Try.bind tryDivide
-let ``go&back`` (str:string) = (tryParse str) |> Try.map (fun num -> (num |> string))*)
-
 module TryS =
     let run (TryS f) =
         try
