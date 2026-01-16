@@ -20,9 +20,9 @@ open Microsoft.Extensions.DependencyInjection
 type UserService = {
     userById: Guid -> TryA<User, string list>
     allUsers: unit -> TryA<User list, string list>
-    addUser: UserProjection -> TryA<int, string list>
+    addUser: UserDto -> TryA<int, string list>
     deleteUser: Guid -> TryA<int, string list>
-    updateUser: UserProjection -> TryA<int, string list>
+    updateUser: UserDto -> TryA<int, string list>
 }
 
 

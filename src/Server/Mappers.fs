@@ -3,7 +3,7 @@
 open Domain
 open Shared.Types
 
-let toUserPrj (u: User) : UserProjection =
+let toUserPrj (u: User) : UserDto =
     match u with
     | Admin a ->
         let (Id id) = a.Id

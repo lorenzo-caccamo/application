@@ -20,7 +20,7 @@ let private createUserData email firstName surname : UserData = {
     LastName = surname
 }
 
-let private map (user: UserProjection) : Result<User, string list> =
+let private map (user: UserDto) : Result<User, string list> =
     let maybeUsrData =
         createUserData <*> Email.Create user.Email
         <!> FirstName.Create user.Name
@@ -45,7 +45,7 @@ let getAllUsers () = reader {
     return r.all ()
 }
 
-let addUser (user: UserProjection) = reader { // TODO Id must not be mapped
+let addUser (user: UserDto) = reader { // TODO Id must not be mapped
     let! (r: UserService) = Reader.ask
 
     return
@@ -59,7 +59,7 @@ let deleteUser (id: Guid) = reader {
     return r.delete (Id id)
 }
 
-let updateUser (user: UserProjection) = reader {
+let updateUser (user: UserDto) = reader {
     let! (r: UserService) = Reader.ask
 
     return

@@ -5,8 +5,8 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="Pages\User\UserModel.fs" />
         <Compile Include="Pages\User\UserView.fs" />
-        <Compile Include="Pages\User\Model.fs" />
         <None Include="postcss.config.js" />
         <None Include="tailwind.config.js" />
         <None Include="index.html" />
@@ -19,7 +19,15 @@
         <ProjectReference Include="..\Shared\Shared.fsproj" />
     </ItemGroup>
     <ItemGroup>
+      <PackageReference Include="Fable.I18Next" Version="0.15.2" />
       <PackageReference Include="FSharpPlus" Version="1.7.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <Compile Include="Locals\Ita.fs" />
+      <Content Include="Locals\Ita\translation.json" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="Locals\En\translation.json" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

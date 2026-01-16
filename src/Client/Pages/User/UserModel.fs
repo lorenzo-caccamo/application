@@ -1,11 +1,11 @@
-﻿module Client.Pages.User.Model
+﻿module UserModel
 
 open System
 open Shared.Types
 
 type Model = {
-    request: UserProjection
-    result: Response<UserProjection list>
+    request: UserDto
+    result: Response<UserDto list>
 }
 
 type Msg =
