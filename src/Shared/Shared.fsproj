@@ -2,14 +2,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Shared</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Functions.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="Monads.fs" />
+    <Compile Include="Types.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="1.38.0" />
     <PackageReference Include="FSharpPlus" Version="1.7.0" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

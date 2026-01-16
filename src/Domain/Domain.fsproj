@@ -6,7 +6,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="UserProjection.fs" />
         <Compile Include="User.fs" />
     </ItemGroup>
 

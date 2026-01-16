@@ -8,14 +8,14 @@ open SAFE
 open Saturn
 open Shared.Monads
 open Domain
-open UserProjection
 open Infrastructure.Repository
 open Application.UserService
 open Infrastructure.DbConnectionHandler
+open Shared.Types
 open Mappers
 open Microsoft.Extensions.DependencyInjection
 
-type Response<'t> = { Result: 't; Error: string list }
+
 
 type UserService = {
     userById: Guid -> TryA<User, string list>
@@ -25,15 +25,9 @@ type UserService = {
     updateUser: UserProjection -> TryA<int, string list>
 }
 
-type AppApi = {
-    getUsers: unit -> Async<Response<UserProjection list>>
-    getUserById: Guid -> Async<Response<UserProjection>>
-    createUser: UserProjection -> Async<Response<int>>
-    updateUser: UserProjection -> Async<Response<int>>
-    deleteUserById: Guid -> Async<Response<int>>
-}
 
-let createUserService (dbHndl: DbConHandler) =
+
+let createService (dbHndl: DbConHandler) =
     let userRepo = {
         byId = userById dbHndl
         all = allUsers dbHndl
@@ -53,48 +47,91 @@ let createUserService (dbHndl: DbConHandler) =
 let appApi (us: UserService) (ctx: HttpContext) = {
     getUsers =
         fun () -> async {
-            let! users = us.allUsers () |> TryA.run
+            let! tryUsers = us.allUsers () |> TryA.run
 
-            match users with
-            | Ok res ->
+            match tryUsers with
+            | Ok users ->
                 return {
-                    Result = res |> List.map toUserPrj
+                    Result = users |> List.map toUserPrj
+                    Error = []
+                }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status400BadRequest // the error can be more detailed
+                return { Result = []; Error = err }
+        }
+
+    getUserById =
+        fun id -> async {
+            let! tryUser = us.userById id |> TryA.run
+
+            match tryUser with
+            | Ok user ->
+                return {
+                    Result = user |> toUserPrj
                     Error = []
                 }
             | Error err ->
                 ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-                return { Result = []; Error = err }
+                return { Result = emptyUser; Error = err }
         }
-    getUserById = failwith "todo"
-    createUser = failwith "todo"
-    updateUser = failwith "todo"
-    deleteUserById = failwith "todo"
+
+    createUser =
+        fun user -> async {
+            let! tryInsert = us.addUser user |> TryA.run
+
+            match tryInsert with
+            | Ok ins -> return { Result = ins; Error = [] }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                return {Result = 0; Error = err }
+        }
+
+    updateUser =
+        fun user -> async{
+            let! tryUpdate = us.updateUser user |> TryA.run
+
+            match tryUpdate with
+            | Ok res -> return { Result = res; Error = [] }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                return {Result = 0; Error = err }
+        }
+
+    deleteUserById =
+        fun id -> async{
+            let! tryDelete = us.deleteUser id |> TryA.run
+
+            match tryDelete with
+            | Ok res -> return { Result = res; Error = [] }
+            | Error err ->
+                ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                return {Result = 0; Error = err }
+        }
 }
 
 
 let private getAppConfig () =
     ConfigurationBuilder()
         .SetBasePath(Directory.GetCurrentDirectory())
-        .AddJsonFile("Properties/appsettings.json", optional = false, reloadOnChange = true)
+        .AddJsonFile("""Properties/appsettings.json""", optional = false, reloadOnChange = true)
         .Build()
 
-let private setConfig (config: IConfigurationRoot) =
+let private setUp (config: IConfigurationRoot) =
     let connstrg = config.GetSection("dbconnection").Value
 
     match DbConHandler.Create(connstrg) with
     | None -> None
     | Some hndl -> Some hndl
 
-let private webApp (hndl: DbConHandler) =
-    Api.make (createUserService hndl |> appApi)
+let private webApp (hndl: DbConHandler) = Api.make (createService hndl |> appApi)
 
 [<EntryPoint>]
 let main _ =
     let config = getAppConfig ()
 
-    match setConfig config with
+    match setUp config with
     | None ->
-        printfn "Missing or invalid connection string. Shutting down..."
+        printfn "Missing or invalid configuration. Shutting down..."
         1
     | Some hndl ->
         let app = application {

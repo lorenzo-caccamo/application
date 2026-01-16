@@ -3,6 +3,7 @@ module Index
 open Elmish
 open SAFE
 open Shared
+open Shared.Types
 
 type Model = {
     Todos: RemoteData<Todo list>
@@ -14,7 +15,7 @@ type Msg =
     | LoadTodos of ApiCall<unit, Todo list>
     | SaveTodo of ApiCall<string, Todo list>
 
-let todosApi = Api.makeProxy<ITodosApi> ()
+let app = Api.makeProxy<AppApi> ()
 
 let init () =
     let initialModel = { Todos = NotStarted; Input = "" }

@@ -111,14 +111,13 @@ module Repository =
 
         tryA {
             return async {
-                let inserted =
+                let! inserted =
                     insert {
                         into userTable
                         value usr
                     }
                     |> conn.InsertAsync<UserEntity>
                     |> Async.AwaitTask
-                    |> Async.RunSynchronously
 
                 if inserted > 0 then
                     return Ok(inserted)
@@ -133,7 +132,7 @@ module Repository =
 
         tryA {
             return async {
-                let updated =
+                let! updated =
                     update {
                         for u in userTable do
                             set usr
@@ -141,7 +140,6 @@ module Repository =
                     }
                     |> conn.UpdateAsync<UserEntity>
                     |> Async.AwaitTask
-                    |> Async.RunSynchronously
 
                 if updated > 0 then
                     return Ok(updated)
@@ -156,14 +154,13 @@ module Repository =
 
         tryA {
             return async {
-                let deleted =
+                let! deleted =
                     delete {
                         for u in userTable do
                             where (u.Id = id)
                     }
                     |> conn.DeleteAsync
                     |> Async.AwaitTask
-                    |> Async.RunSynchronously
 
                 if deleted > 0 then
                     return Ok(deleted)

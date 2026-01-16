@@ -5,6 +5,8 @@
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="Pages\User\UserView.fs" />
+        <Compile Include="Pages\User\Model.fs" />
         <None Include="postcss.config.js" />
         <None Include="tailwind.config.js" />
         <None Include="index.html" />

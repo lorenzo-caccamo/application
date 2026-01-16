@@ -3,9 +3,10 @@
 open System
 open Domain
 open Shared.Monads
-open UserProjection
+open Shared.Types
 
-type IUserRepository = {
+
+type UserService = {
     byId: UserId -> TryA<User, string list>
     all: unit -> TryA<User list, string list>
     add: User -> TryA<int, string list>
@@ -31,20 +32,21 @@ let private map (user: UserProjection) : Result<User, string list> =
         | Administrator -> Ok(User.Admin { Id = Id user.Id; Data = u })
         | NormalUser -> Ok(User.Normal { Id = Id user.Id; Data = u })
         | Readonly -> Ok(User.ReadOnly { Id = Id user.Id; Data = u })
+        | Undefined -> Error ["Undefined user role"]
     | Error err -> Error err
 
 let getUserById (id: Guid) = reader {
-    let! (r: IUserRepository) = Reader.ask
+    let! (r: UserService) = Reader.ask
     return r.byId (Id id)
 }
 
 let getAllUsers () = reader {
-    let! (r: IUserRepository) = Reader.ask
+    let! (r: UserService) = Reader.ask
     return r.all ()
 }
 
 let addUser (user: UserProjection) = reader { // TODO Id must not be mapped
-    let! (r: IUserRepository) = Reader.ask
+    let! (r: UserService) = Reader.ask
 
     return
         match map user with
@@ -53,12 +55,12 @@ let addUser (user: UserProjection) = reader { // TODO Id must not be mapped
 }
 
 let deleteUser (id: Guid) = reader {
-    let! (r: IUserRepository) = Reader.ask
+    let! (r: UserService) = Reader.ask
     return r.delete (Id id)
 }
 
 let updateUser (user: UserProjection) = reader {
-    let! (r: IUserRepository) = Reader.ask
+    let! (r: UserService) = Reader.ask
 
     return
         match map user with

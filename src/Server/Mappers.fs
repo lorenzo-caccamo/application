@@ -1,8 +1,7 @@
 ﻿module Mappers
 
-open System
 open Domain
-open UserProjection
+open Shared.Types
 
 let toUserPrj (u: User) : UserProjection =
     match u with
